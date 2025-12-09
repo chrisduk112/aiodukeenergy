@@ -1,67 +1,152 @@
-# aiodukeenergy
+# aiodukeenergy (OAuth Fix Fork)
 
-<p align="center">
-  <a href="https://github.com/hunterjm/aiodukeenergy/actions/workflows/ci.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/hunterjm/aiodukeenergy/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status" >
-  </a>
-  <a href="https://aiodukeenergy.readthedocs.io">
-    <img src="https://img.shields.io/readthedocs/aiodukeenergy.svg?logo=read-the-docs&logoColor=fff&style=flat-square" alt="Documentation Status">
-  </a>
-  <a href="https://codecov.io/gh/hunterjm/aiodukeenergy">
-    <img src="https://img.shields.io/codecov/c/github/hunterjm/aiodukeenergy.svg?logo=codecov&logoColor=fff&style=flat-square" alt="Test coverage percentage">
-  </a>
-</p>
-<p align="center">
-  <a href="https://python-poetry.org/">
-    <img src="https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json" alt="Poetry">
-  </a>
-  <a href="https://github.com/astral-sh/ruff">
-    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff">
-  </a>
-  <a href="https://github.com/pre-commit/pre-commit">
-    <img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=flat-square" alt="pre-commit">
-  </a>
-</p>
-<p align="center">
-  <a href="https://pypi.org/project/aiodukeenergy/">
-    <img src="https://img.shields.io/pypi/v/aiodukeenergy.svg?logo=python&logoColor=fff&style=flat-square" alt="PyPI Version">
-  </a>
-  <img src="https://img.shields.io/pypi/pyversions/aiodukeenergy.svg?style=flat-square&logo=python&amp;logoColor=fff" alt="Supported Python versions">
-  <img src="https://img.shields.io/pypi/l/aiodukeenergy.svg?style=flat-square" alt="License">
-</p>
+[![License](https://img.shields.io/pypi/l/aiodukeenergy.svg?style=flat-square)](https://github.com/chrisduk112/aiodukeenergy/blob/main/LICENSE)
 
 ---
 
-**Documentation**: <a href="https://aiodukeenergy.readthedocs.io" target="_blank">https://aiodukeenergy.readthedocs.io </a>
-
-**Source Code**: <a href="https://github.com/hunterjm/aiodukeenergy" target="_blank">https://github.com/hunterjm/aiodukeenergy </a>
+**This is a fork of [hunterjm/aiodukeenergy](https://github.com/hunterjm/aiodukeenergy) with fixes for the November 2025 Duke Energy OAuth migration.**
 
 ---
 
-Asyncio Duke Energy
+## What Changed
+
+In November 2025, Duke Energy migrated to a new OpenID Connect / Auth0 authentication system. The original library's simple username/password authentication no longer works.
+
+This fork implements:
+- New OAuth 2.0 authentication flow with PKCE
+- Updated client credentials from Duke Energy app v7.0
+- New token exchange endpoint (`/login/auth-token`)
+- Refresh token support
 
 ## Installation
 
-Install this via pip (or your favourite package manager):
+### For Home Assistant Users
 
-`pip install aiodukeenergy`
+See the [Home Assistant Installation Guide](#home-assistant-installation) below.
 
-## Contributors ✨
+### For Python Projects
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+Install directly from GitHub:
 
-<!-- prettier-ignore-start -->
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- markdownlint-disable -->
-<!-- markdownlint-enable -->
-<!-- ALL-CONTRIBUTORS-LIST:END -->
-<!-- prettier-ignore-end -->
+```bash
+pip install git+https://github.com/chrisduk112/aiodukeenergy.git
+```
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+## Usage
+
+```python
+import asyncio
+import aiohttp
+from aiodukeenergy import DukeEnergy
+
+async def main():
+    async with aiohttp.ClientSession() as session:
+        client = DukeEnergy(
+            username="your_email@example.com",
+            password="your_password",
+            session=session,
+        )
+        
+        try:
+            # Authenticate
+            await client.authenticate()
+            print(f"Authenticated as: {client.email}")
+            
+            # Get meters
+            meters = await client.get_meters()
+            for serial, meter in meters.items():
+                print(f"Meter: {serial}")
+                
+        finally:
+            await client.close()
+
+asyncio.run(main())
+```
+
+## Home Assistant Installation
+
+To use this fork with Home Assistant's Duke Energy integration:
+
+### Method 1: Custom Components (Recommended)
+
+1. **SSH into your Home Assistant** or use the File Editor add-on
+
+2. **Navigate to your config directory**:
+   ```bash
+   cd /config
+   ```
+
+3. **Create custom_components directory** (if it doesn't exist):
+   ```bash
+   mkdir -p custom_components/duke_energy
+   ```
+
+4. **Copy the official integration files** and modify them to use this fork.
+
+   Alternatively, use the pip override method below.
+
+### Method 2: Override pip package
+
+1. **SSH into your Home Assistant**
+
+2. **Install this fork**:
+   ```bash
+   pip install git+https://github.com/chrisduk112/aiodukeenergy.git --upgrade
+   ```
+
+3. **Restart Home Assistant**
+
+4. **Re-add the Duke Energy integration** from Settings → Devices & Services
+
+**Note**: This method may need to be repeated after Home Assistant updates.
+
+### Method 3: Using a requirements override (Advanced)
+
+1. Create a file `/config/requirements_override.txt`:
+   ```
+   aiodukeenergy @ git+https://github.com/chrisduk112/aiodukeenergy.git
+   ```
+
+2. Add to your `configuration.yaml`:
+   ```yaml
+   homeassistant:
+     packages: !include_dir_named packages
+   ```
+
+3. Restart Home Assistant
+
+## Troubleshooting
+
+### Authentication Errors
+
+If you see `403 Forbidden` or `410 Gone` errors:
+- Make sure you're using this fork, not the original library
+- Verify your Duke Energy credentials work on their website
+- Check Home Assistant logs for detailed error messages
+
+### Enable Debug Logging
+
+Add to `configuration.yaml`:
+```yaml
+logger:
+  default: info
+  logs:
+    aiodukeenergy: debug
+    homeassistant.components.duke_energy: debug
+```
+
+## Contributing
+
+If you find issues or have improvements:
+1. Fork this repository
+2. Create a feature branch
+3. Submit a pull request
 
 ## Credits
 
-This package was created with
-[Copier](https://copier.readthedocs.io/) and the
-[browniebroke/pypackage-template](https://github.com/browniebroke/pypackage-template)
-project template.
+- Original library: [hunterjm/aiodukeenergy](https://github.com/hunterjm/aiodukeenergy)
+- OAuth reverse engineering: Community members on [GitHub Issue #155863](https://github.com/home-assistant/core/issues/155863)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
